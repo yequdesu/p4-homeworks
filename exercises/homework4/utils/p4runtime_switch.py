@@ -1,4 +1,3 @@
-# SPDX-License-Identifier: Apache-2.0
 # Copyright 2017-present Barefoot Networks, Inc.
 # Copyright 2017-present Open Networking Foundation
 #
@@ -15,16 +14,15 @@
 # limitations under the License.
 #
 
-import os
-import tempfile
+import sys, os, tempfile, socket
 from time import sleep
 
-from mininet.log import debug, error, info
-from mininet.moduledeps import pathCheck
 from mininet.node import Switch
-from netstat import check_listening_on_port
-from p4_mininet import SWITCH_START_TIMEOUT, P4Switch
+from mininet.moduledeps import pathCheck
+from mininet.log import info, error, debug
 
+from p4_mininet import P4Switch, SWITCH_START_TIMEOUT
+from netstat import check_listening_on_port
 
 class P4RuntimeSwitch(P4Switch):
     "BMv2 switch with gRPC support"
@@ -90,10 +88,6 @@ class P4RuntimeSwitch(P4Switch):
             P4Switch.device_id += 1
         self.nanomsg = "ipc:///tmp/bm-{}-log.ipc".format(self.device_id)
 
-        self.cpu_port = None
-        if "cpu_port" in kwargs:
-            self.cpu_port = kwargs["cpu_port"]
-
 
     def check_switch_started(self, pid):
         for _ in range(SWITCH_START_TIMEOUT * 2):
@@ -127,13 +121,8 @@ class P4RuntimeSwitch(P4Switch):
             args.append('--thrift-port ' + str(self.thrift_port))
         if self.grpc_port:
             args.append("-- --grpc-server-addr 0.0.0.0:" + str(self.grpc_port))
-        # if self.cpu_port:
-        #     args.append("--cpu-port " + str(self.cpu_port))
-        args.append("--cpu-port 252") 
-        # hardcoded for now
         cmd = ' '.join(args)
         info(cmd + "\n")
-        print(cmd + "\n")
 
 
         pid = None
@@ -145,3 +134,4 @@ class P4RuntimeSwitch(P4Switch):
             error("P4 switch {} did not start correctly.\n".format(self.name))
             exit(1)
         info("P4 switch {} has been started.\n".format(self.name))
+

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# SPDX-License-Identifier: Apache-2.0
 #
 # Copyright 2017-present Open Networking Foundation
 #
@@ -20,9 +19,8 @@ import json
 import os
 import sys
 
-from p4.config.v1 import p4info_pb2
-
-from . import bmv2, helper
+from . import bmv2
+from . import helper
 
 
 def error(msg):
@@ -33,9 +31,6 @@ def info(msg):
 
 
 class ConfException(Exception):
-    pass
-
-class InvalidFileContentException(ConfException):
     pass
 
 
@@ -91,16 +86,9 @@ def check_switch_conf(sw_conf, workdir):
         real_path = os.path.join(workdir, sw_conf[conf_key])
         if not os.path.exists(real_path):
             raise ConfException("file does not exist %s" % real_path)
-        # check for file content (e.g. JSON format for bmv2_json)
-        if conf_key == "bmv2_json":
-            with open(real_path, 'r') as f:
-                try:
-                    json.load(f)  # Check if the file can be parsed as JSON
-                except json.JSONDecodeError as e:
-                    raise InvalidFileContentException(f"Invalid JSON content in {real_path}: {e}")
 
 
-def program_switch(addr, device_id, sw_conf_file, workdir, proto_dump_fpath, runtime_json):
+def program_switch(addr, device_id, sw_conf_file, workdir, proto_dump_fpath):
     sw_conf = json_load_byteified(sw_conf_file)
     try:
         check_switch_conf(sw_conf=sw_conf, workdir=workdir)
@@ -138,7 +126,6 @@ def program_switch(addr, device_id, sw_conf_file, workdir, proto_dump_fpath, run
             info("Inserting %d table entries..." % len(table_entries))
             for entry in table_entries:
                 info(tableEntryToString(entry))
-                validateTableEntry(entry, p4info_helper, runtime_json)
                 insertTableEntry(sw, entry, p4info_helper)
 
         if 'multicast_group_entries' in sw_conf:
@@ -157,27 +144,6 @@ def program_switch(addr, device_id, sw_conf_file, workdir, proto_dump_fpath, run
 
     finally:
         sw.shutdown()
-
-
-def validateTableEntry(flow, p4info_helper, runtime_json):
-    table_name = flow['table']
-    match_fields = flow.get('match')  # None if not found
-    priority = flow.get('priority')  # None if not found
-    match_types_with_priority = [
-        p4info_pb2.MatchField.TERNARY,
-        p4info_pb2.MatchField.RANGE,
-        p4info_pb2.MatchField.OPTIONAL
-    ]
-    if match_fields is not None and (priority is None or priority == 0):
-        for match_field_name, _ in match_fields.items():
-            p4info_match = p4info_helper.get_match_field(
-                table_name, match_field_name)
-            match_type = p4info_match.match_type
-            if match_type in match_types_with_priority:
-                raise AssertionError(
-                    "non-zero 'priority' field is required for all entries for table {} in {}"
-                    .format(table_name, runtime_json)
-                )
 
 
 def insertTableEntry(sw, flow, p4info_helper):
